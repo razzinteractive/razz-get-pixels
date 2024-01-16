@@ -11,8 +11,7 @@ var fs            = require('fs')
 var mime          = require('mime-types')
 var parseDataURI  = require('parse-data-uri')
 
-var http = require('http');
-var https = require('https');
+var axios = require('axios');
 
 function handlePNG(data, cb) {
   var png = new PNG();
@@ -129,7 +128,7 @@ function doParse(mimeType, data, cb) {
   }
 }
 
-module.exports = function getPixels(url, type, cb) {
+module.exports = async function getPixels(url, type, cb) {
   if(!cb) {
     cb = type
     type = ''
@@ -158,31 +157,44 @@ module.exports = function getPixels(url, type, cb) {
       })
     }
   } else if(url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
-    var request = http;
-    if (url.indexOf('https://') === 0) {
-      request = https;
-    }
-    request.get(url, function(err, response, body) {
-      if(err) {
-        cb(err)
-        return
-      }
 
-      type = type;
-      if(!type){
-        if(response.getHeader !== undefined){
-	        type = response.getHeader('content-type');
+    try {
+      var response = await axios.get(url).then((res) => {
+        const type = res.headers['content-type'];
+        if(!type) {
+          cb(new Error('Invalid content-type'))
+          return
         }
-        else if(response.headers !== undefined){
-          type = response.headers['content-type'];
-        }
-      }
-      if(!type) {
-        cb(new Error('Invalid content-type'))
-        return
-      }
-      doParse(type, body, cb)
-    });
+
+        doParse(type, res.data, cb);
+      })
+    }
+    catch(e) {
+      cb(e);
+      return;
+    }
+
+    // request.get(url, function(err, response, body) {
+    //   if(err) {
+    //     cb(err)
+    //     return
+    //   }
+    //
+    //   type = type;
+    //   if(!type){
+    //     if(response.getHeader !== undefined){
+	  //       type = response.getHeader('content-type');
+    //     }
+    //     else if(response.headers !== undefined){
+    //       type = response.headers['content-type'];
+    //     }
+    //   }
+    //   if(!type) {
+    //     cb(new Error('Invalid content-type'))
+    //     return
+    //   }
+    //   doParse(type, body, cb)
+    // });
   } else {
     fs.readFile(url, function(err, data) {
       if(err) {
